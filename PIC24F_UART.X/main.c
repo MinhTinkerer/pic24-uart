@@ -8,6 +8,7 @@
 // #include <stdio.h>
 // #include <stdlib.h>
 #include <xc.h>
+#include <PPS.h>
 
 /* MCU configuration bits */
 _CONFIG1
@@ -18,7 +19,7 @@ _CONFIG1
    & FWDTEN_OFF   // Watchdog Timer Disabled
    & WINDIS_OFF   // Windowed Watchdog Timer Disabled
 )
-CONFIG2
+_CONFIG2
 (
    IESO_ON          // Two Speed Start-up
    //& PLL96MHZ_ON    // 96MHz PLL Enabled
@@ -54,62 +55,63 @@ volatile int inhead;
  *
  *
  */
-void _ISR _U1RXInterrupt()
+void _ISR _U1RXInterrupt(void)
 {
-    while(U1STAbits.URXDA)
+    char c;
+    U1TXREG = '4';
+    while(U1STAbits.URXDA != 0)
     {
         // put char into buffer
-        // c = U1RXREG;
+        // this is just for debugging, no real code here
+        c = U1RXREG;
+        U1TXREG = c; //echo
     }
     IFS0bits.U1RXIF = 0;
-
 }
-void _ISR _U1TXInterrupt()
+void _ISR _U1TXInterrupt(void)
 {
-    while(U1STAbits.UTXBF == 1)
-    {
+    //while(U1STAbits.UTXBF == 1)
+    //{
         // send data
         // U1TXREG = c;
-    }
+    //}
+    U1TXREG = '3';
     IFS0bits.U1TXIF = 0;
 
 }
 void InitMCU()
 {
-       T2CON = 0x0000U;  /* Use Internal Osc (Fcy), 16 bit mode, prescaler = 1 */
-     // PIC24FJ256GB206 doesn't have port A
-        TRISB = 0;
-        TRISC = 0;
-        TRISD = 0;
-        TRISE = 0;
-        TRISF = 0;
-        TRISG = 0;
-        //ODCBbits.ODB9 = 1;    //open-drain
-        PORTB = 0;
-        //VBUS_ON();
-        //AD1PCFGL = 0xffff;    //analog off
+    T2CON = 0x0000U;  /* Use Internal Osc (Fcy), 16 bit mode, prescaler = 1 */
+    // PIC24FJ256GB206 doesn't have port A
+    TRISB = 0;
+    TRISC = 0;
+    TRISD = 0;
+    TRISE = 0;
+    TRISF = 0;
+    TRISG = 0;
+    //ODCBbits.ODB9 = 1;    //open-drain
+    PORTB = 0;
+    //VBUS_ON();
+    //AD1PCFGL = 0xffff;    //analog off
 
     // PIC24FJ256GB206 turns off analog differently
-        ANSB = 0;
-        ANSC = 0;
-        ANSD = 0;
-        //ANSE = 0;
-        ANSF = 0;
-        ANSG = 0;
-//AD1PCFGbits.PCFG10 = 1;
-
-        //Set serial console pins
-        //PPSUnLock;
-        //PPSOutput(PPS_RP5, PPS_U2TX);
-        //PPSInput(PPS_U2RX, PPS_RP6);
-        //PPSLock;
-
+    ANSB = 0;
+    ANSC = 0;
+    ANSD = 0;
+    //ANSE = 0;
+    ANSF = 0;
+    ANSG = 0;
+    //AD1PCFGbits.PCFG10 = 1;
 }
 void InitUART()
 {
-    RPINR18bits.U1RXR = 17; // Map RX to RP6
-    RPOR2bits.RP4R = X;    // Map TX to RP5 ??
-    IPC3bits.U1TXIP2 = 1;  // Interrupt priority
+    /* Set serial console pins */
+    PPSUnLock;
+    PPSOutput(PPS_RP21, PPS_U1TX);
+    PPSInput(PPS_U1RX, PPS_RP26);
+    PPSLock;
+
+    IPC3bits.U1TXIP2 = 1;  /* Interrupt priority */
     IPC3bits.U1TXIP1 = 0;
     IPC3bits.U1TXIP0 = 0;
     IPC2bits.U1RXIP2 = 1;
@@ -119,7 +121,7 @@ void InitUART()
     U1STA = 0;
     U1MODEbits.WAKE = 1;    /* wake up from sleep*/
     // U1MODEbits.ABAUD = 1;   /* Automatic baud rate, requires 55h sync*/
-    U1BRG = ((16000000/9600)/16)-1 /* Baud rate */
+    U1BRG = ((16000000/9600)/16)-1; /* Baud rate */
     // U1MODEbits.LPBACK = 1; /* Loopback */
     // U1MODEbits.BRGH - 1; /*High baud rate*/
     U1MODEbits.PDSEL = 0; /* 11 - 9 bit, none
@@ -130,20 +132,29 @@ void InitUART()
     U1MODEbits.STSEL = 1; /* Stop bit set */
     U1MODEbits.UARTEN = 1;  /* Enable UART */
     U1STAbits.UTXEN = 1 ; /* Enable TX, must be after uarten */
-    IFS0bits.U1RXIF = 0;  /* Clean interrupt flag */
-    IFS0bits.U1TXIF = 0;
     IEC0bits.U1RXIE = 1; /* Enable TX interrupts */
     IEC0bits.U1RXIE = 1; /* Enable RX interrupts*/
+    IFS0bits.U1RXIF = 0;  /* Clean interrupt flag */
+    IFS0bits.U1TXIF = 0;
+
 }
 /*
  * 
  */
 int main(int argc, char** argv) {
+    char c;
     inbuf[INBUFSIZE - 1] = '\0';
     InitMCU();
     InitUART();
+//    U1TXREG = '1';
     while(1) {
+//        U1TXREG = '2';
         Idle();
+ //       while(U1STAbits.URXDA == 0);
+        // put char into buffer
+        // this is just for debugging, no real code here
+//        c = U1RXREG;
+//        U1TXREG = c; //increment character and return it back
     }
     return (0);
 }
