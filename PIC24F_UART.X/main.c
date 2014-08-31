@@ -78,7 +78,7 @@ void _ISR _U1RXInterrupt(void)
 {
     while(U1STAbits.URXDA != 0)
     {
-        if (inhead + 1 >= INBUFSIZE)
+        if (inhead >= INBUFSIZE - 1)
             inhead = -1;
         inbuf[inhead + 1] = U1RXREG;
         inhead++; /* Do increment to be the last to avoid racing cond. */
