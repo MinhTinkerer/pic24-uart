@@ -58,7 +58,6 @@ volatile int inhead;
 void _ISR _U1RXInterrupt(void)
 {
     char c;
-    U1TXREG = '4';
     while(U1STAbits.URXDA != 0)
     {
         // put char into buffer
@@ -82,6 +81,14 @@ void _ISR _U1TXInterrupt(void)
 void InitMCU()
 {
     T2CON = 0x0000U;  /* Use Internal Osc (Fcy), 16 bit mode, prescaler = 1 */
+    //AD1PCFGL = 0xffff;    //analog off
+    // PIC24FJ256GB206 turns off analog differently
+    ANSB = 0;
+    ANSC = 0;
+    ANSD = 0;
+    //ANSE = 0;
+    ANSF = 0;
+    ANSG = 0;
     // PIC24FJ256GB206 doesn't have port A
     TRISB = 0;
     TRISC = 0;
@@ -92,15 +99,6 @@ void InitMCU()
     //ODCBbits.ODB9 = 1;    //open-drain
     PORTB = 0;
     //VBUS_ON();
-    //AD1PCFGL = 0xffff;    //analog off
-
-    // PIC24FJ256GB206 turns off analog differently
-    ANSB = 0;
-    ANSC = 0;
-    ANSD = 0;
-    //ANSE = 0;
-    ANSF = 0;
-    ANSG = 0;
     //AD1PCFGbits.PCFG10 = 1;
 }
 void InitUART()
@@ -110,6 +108,8 @@ void InitUART()
     PPSOutput(PPS_RP21, PPS_U1TX);
     PPSInput(PPS_U1RX, PPS_RP26);
     PPSLock;
+
+    TRISGbits.TRISG7 = 1; /* Switch RP26 to input*/
 
     IPC3bits.U1TXIP2 = 1;  /* Interrupt priority */
     IPC3bits.U1TXIP1 = 0;
@@ -146,15 +146,8 @@ int main(int argc, char** argv) {
     inbuf[INBUFSIZE - 1] = '\0';
     InitMCU();
     InitUART();
-//    U1TXREG = '1';
     while(1) {
-//        U1TXREG = '2';
         Idle();
- //       while(U1STAbits.URXDA == 0);
-        // put char into buffer
-        // this is just for debugging, no real code here
-//        c = U1RXREG;
-//        U1TXREG = c; //increment character and return it back
     }
     return (0);
 }
