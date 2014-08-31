@@ -46,38 +46,56 @@ _CONFIG3
 #define LED_TOGGLE()            (LATD ^= (1U << 2))
 
 
-#define INBUFSIZE 40
-volatile char inbuf[INBUFSIZE];
-volatile int intail;
-volatile int inhead;
+#define INBUFSIZE 20
+volatile char inbuf[INBUFSIZE];  /* circular buffer */
+volatile int intail; /* last character read index*/
+volatile int inhead; /* last character written index */
 
 /*
  *
  *
  */
+char UARTReadChar(int blocking)
+{
+    if (blocking) {
+        while (intail == inhead)
+            Idle();
+    } else {
+        if (intail == inhead)
+            return '\0'; /* Nonblocking "nothing to return" */
+    }
+    if (++intail >= INBUFSIZE)
+        intail = 0;
+    return inbuf[intail];
+}
+void UARTWriteCharDirect(char ch)
+{
+    while(U1STAbits.UTXBF == 1);
+    U1TXREG = ch;
+}
+
 void _ISR _U1RXInterrupt(void)
 {
-    char c;
     while(U1STAbits.URXDA != 0)
     {
-        // put char into buffer
-        // this is just for debugging, no real code here
-        c = U1RXREG;
-        U1TXREG = c; //echo
+        if (inhead + 1 >= INBUFSIZE)
+            inhead = -1;
+        inbuf[inhead + 1] = U1RXREG;
+        inhead++; /* Do increment to be the last to avoid racing cond. */
     }
     IFS0bits.U1RXIF = 0;
 }
-void _ISR _U1TXInterrupt(void)
-{
+//void _ISR _U1TXInterrupt(void)
+//{
     //while(U1STAbits.UTXBF == 1)
     //{
         // send data
         // U1TXREG = c;
     //}
-    U1TXREG = '3';
-    IFS0bits.U1TXIF = 0;
+//    U1TXREG = '3';
+//    IFS0bits.U1TXIF = 0;
 
-}
+//}
 void InitMCU()
 {
     T2CON = 0x0000U;  /* Use Internal Osc (Fcy), 16 bit mode, prescaler = 1 */
@@ -132,22 +150,24 @@ void InitUART()
     U1MODEbits.STSEL = 1; /* Stop bit set */
     U1MODEbits.UARTEN = 1;  /* Enable UART */
     U1STAbits.UTXEN = 1 ; /* Enable TX, must be after uarten */
-    IEC0bits.U1RXIE = 1; /* Enable TX interrupts */
     IEC0bits.U1RXIE = 1; /* Enable RX interrupts*/
     IFS0bits.U1RXIF = 0;  /* Clean interrupt flag */
-    IFS0bits.U1TXIF = 0;
+  //  IEC0bits.U1TXIE = 1; /* Enable TX interrupts */
+  //  IFS0bits.U1TXIF = 0;
+  
 
 }
 /*
  * 
  */
 int main(int argc, char** argv) {
-    char c;
-    inbuf[INBUFSIZE - 1] = '\0';
+    intail = 0;
+    inhead = 0;
     InitMCU();
     InitUART();
     while(1) {
-        Idle();
+        // Idle();
+        UARTWriteCharDirect(UARTReadChar(1));
     }
     return (0);
 }
